@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.6.2 (2026-10-05)
+
+### Fixed
+- migrate to Node 24 — upload-pages-artifact v5, node-version 24 (0.5.2)
+
 ## 0.6.1 (2026-10-05)
 
 ### Other
