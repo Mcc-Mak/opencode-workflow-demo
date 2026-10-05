@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.6.1 (2026-10-05)
+
+### Other
+- docs: reframe Step 2 as separation of concerns (backlog, items, tasklist) (0.5.1)
+
 ## 0.6.0 (2026-10-05)
 
 ### Added
