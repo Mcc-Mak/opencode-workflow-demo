@@ -78,7 +78,7 @@ sequenceDiagram
 | `dev-001` → `dev` | `fast_checks` | Validate compose, build the image, lint. Gates the promotion PR. |
 | `dev` → `main` | `security_checks` | CodeQL (SAST) + SonarQube Cloud (SCA + quality gate). Fails closed on findings. |
 | `main` → Pages | `pages` | Build the React + Vite application (`codebase/site/`) and deploy to GitHub Pages. |
-| `main` → Wiki | `wiki` | Sync `docbase/` markdown to the GitHub Wiki. Runs in parallel with `pages`. Bootstraps the wiki on first run (no manual UI init needed). |
+| `main` → Wiki | `wiki` | Sync `docbase/` markdown to the GitHub Wiki. Runs in parallel with `pages`. Non-blocking: warns and skips if the wiki is not yet initialized (needs one-time UI page creation). |
 
 ## Versioning
 
@@ -121,7 +121,8 @@ flowchart TD
 
 - Enable GitHub Pages: **Settings → Pages → Source: GitHub Actions**.
 - Add `dev-001` and `main` as deployment branches in **Settings → Environments → github-pages**.
-- Enable the GitHub Wiki feature: **Settings → General → Features → Wikis** (the `configure-secrets.sh` script does this; the `wiki` job bootstraps the wiki content on first run — no manual page creation needed).
+- Enable the GitHub Wiki feature: **Settings → General → Features → Wikis** (the `configure-secrets.sh` script does this).
+- Initialize the GitHub Wiki (one-time): open **{repo}/wiki** in the browser and create the first page. GitHub does not create the `.wiki.git` repo until this is done. The `wiki` job warns and skips (non-blocking) until then.
 - Protect `dev` and `main`; require the matching status checks before merge.
 
 ### Deployment topology (PlantUML)

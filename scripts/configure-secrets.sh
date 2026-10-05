@@ -78,10 +78,11 @@ fi
 echo ""
 echo "Enabling GitHub Wiki..."
 # Turn on the repository wiki feature. The wiki job publishes docbase/ here.
-# The job bootstraps the wiki itself (no manual UI page creation needed) —
-# it pushes a fresh local repo to {repo}.wiki.git on the first run.
+# Note: GitHub does not create the .wiki.git repo until the first page is
+# saved through the web UI; the wiki job warns and skips (non-blocking)
+# until then.
 gh api -X PATCH repos/:owner/:repo -F has_wiki=true >/dev/null 2>&1 \
-  && echo "  Wiki feature enabled." \
+  && echo "  Wiki feature enabled. Create the first page once at {repo}/wiki to activate it." \
   || echo "  ::warning:: Could not enable the Wiki via API. Enable it manually: Settings → General → Features → Wikis."
 
 # ── Deployment branch policy ────────────────────────────────────────────────
