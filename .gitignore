@@ -1,0 +1,12 @@
+# environment files
+.env
+*.local
+
+# dependencies & build artifacts
+node_modules/
+dist/
+.scannerwork/
+
+# os / editor
+.DS_Store
+*.swp
