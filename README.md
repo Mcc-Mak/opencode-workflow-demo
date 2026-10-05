@@ -1,6 +1,31 @@
 # opencode-workflow-demo
 
+> **GitHub Pages Entrypoint:** <https://mcc-mak.github.io/opencode-workflow-demo/>
+
+> **Full documentation index:** [`docbase/TOCTREE.md`](docbase/TOCTREE.md)
+
 A standard template for OpenCode projects: a coding workflow, a progressive GitHub Actions CI/CD pipeline, and strict semantic versioning. The contents of `codebase/` are project-specific; everything else is reusable infrastructure.
+
+## CI/CD pipeline (Mermaid)
+
+```mermaid
+flowchart LR
+  subgraph dev001["dev-001"]
+    PUSH["push"] --> RELEASE["release\nversion + CHANGELOG"]
+    RELEASE --> FAST["fast_checks\ncompose • build • lint"]
+    FAST --> PROMOTE["promote"]
+  end
+  subgraph dev["dev"]
+    PR1["PR dev-001→dev\ngate: Fast Checks"]
+  end
+  subgraph main["main"]
+    PR2["PR dev→main\ngate: Security & Quality"]
+  end
+  subgraph pages["Pages"]
+    DEPLOY["Vite site deploy"]
+  end
+  PROMOTE -->|merge| PR1 -->|trigger| PR2 -->|merge| DEPLOY
+```
 
 ## Structure
 
@@ -23,6 +48,31 @@ A standard template for OpenCode projects: a coding workflow, a progressive GitH
 ## Workflow
 
 Every change follows six steps (see `AGENTS.md`): capture the requirement → implement in `codebase/` → document in `docbase/` → update `CHANGELOG.md` → commit to `dev-001` → CI/CD runs.
+
+### Workflow steps (PlantUML)
+
+```plantuml
+@startuml
+!theme plain
+skinparam actorStyle awesome
+
+actor User as U
+participant "codebase/" as C
+participant "docbase/" as D
+participant "CHANGELOG.md" as CL
+participant "dev-001" as G
+participant "CI/CD" as CI
+
+U -> C : 1. Capture requirement
+U -> C : 2. Implement
+U -> D : 3. Document
+U -> CL : 4. Update changelog
+U -> G : 5. Commit + push
+G -> CI : 6. Pipeline runs
+CI -> CI : release → fast_checks → promote
+CI -> CI : → security_checks → pages
+@enduml
+```
 
 ## Branch model
 
@@ -47,18 +97,23 @@ Strict `major.minor.patch`. The `release` job derives the bump from conventional
 
 ## Prerequisites
 
-Configure secrets and Pages from a local `.env` (auto-config):
+Configure secrets, notification settings, and Pages from a local `.env` (auto-config):
 
 ```bash
-cp .env.example .env          # fill in PROMOTE_TOKEN and SONAR_TOKEN
+cp .env.example .env          # fill in tokens + notification values
 ./scripts/configure-secrets.sh
 ```
 
 What you need before filling in `.env`:
 
+- **`GIT_PUSH_TOKEN`** — GitHub PAT with `repo` + `workflow` scopes (pushes release commits).
 - **`PROMOTE_TOKEN`** — GitHub PAT with `repo` + `workflow` scopes (PRs created by `GITHUB_TOKEN` don't trigger checks, so promotion needs a PAT).
-- **`SONAR_TOKEN`** — SonarQube Cloud token (SonarCloud → My Account → Security).
+- **`SONAR_TOKEN`** — SonarQube Cloud token (SonarCloud → My Account → Security). Optional.
+- **`NOTIFICATION_ADDRESS`** — Email recipient for deployment notifications.
+- **`NOTIFICATION_HEADER`** — Email subject header (e.g. `GitHub - [HKO] opencode-workflow-demo`).
+- **`NOTIFICATION_ACTIVE`** — `true` to enable, `false` to disable.
 - GitHub Pages source set to **GitHub Actions** (the script does this; or set it manually under Settings → Pages).
+- `dev-001` registered as a deployment branch in **Settings → Environments → github-pages** (the script does this too).
 
 Real `.env` is gitignored — never commit it.
 

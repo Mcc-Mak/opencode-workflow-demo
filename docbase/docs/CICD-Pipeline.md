@@ -8,6 +8,61 @@ dev-001 → dev → main → GitHub Pages
 
 Working branch is always `dev-001`. Promotion is automated by GitHub Actions; never push directly to `dev` or `main`.
 
+### Pipeline overview (Mermaid)
+
+```mermaid
+flowchart LR
+  subgraph dev-001["dev-001 (working branch)"]
+    PUSH["push to dev-001"]
+    RELEASE["release\nbump version + CHANGELOG"]
+    FAST["fast_checks\ncompose • build • lint"]
+    PROMOTE["promote\nopen PRs + merge on gate pass"]
+  end
+  subgraph dev["dev (staging)"]
+    PR1["PR: dev-001 → dev"]
+  end
+  subgraph main["main (release)"]
+    PR2["PR: dev → main"]
+    SEC["security_checks\nCodeQL + SonarQube"]
+  end
+  subgraph pages["GitHub Pages"]
+    DEPLOY["pages\nbuild + deploy Vite site"]
+  end
+
+  PUSH --> RELEASE --> FAST --> PROMOTE
+  PROMOTE -->|create PR| PR1 -->|gate: Fast Checks| PROMOTE
+  PROMOTE -->|merge| PR2 -->|gate: Security & Quality| SEC
+  SEC -->|merge to main| DEPLOY
+```
+
+### Promotion sequence (Mermaid)
+
+```mermaid
+sequenceDiagram
+  participant dev001 as dev-001
+  participant R as release job
+  participant F as fast_checks
+  participant P as promote job
+  participant GH as GitHub PRs
+  participant S as security_checks
+  participant PG as pages job
+
+  dev001->>R: push (conventional commit)
+  R->>R: bump version, update CHANGELOG
+  R->>dev001: push release commit
+  R->>F: (needs release)
+  F->>F: validate compose, build, lint
+  F->>P: (needs fast_checks)
+  P->>GH: create PR dev-001 → dev
+  GH-->>GH: Fast Checks gate runs
+  P->>GH: merge PR (gate passed)
+  P->>GH: create PR dev → main
+  GH-->>GH: Security & Quality Gate runs
+  P->>GH: merge PR (gate passed)
+  GH->>PG: push to main triggers pages
+  PG->>PG: build Vite site, deploy to Pages
+```
+
 ## Stages
 
 | Hop | Workflow job | Purpose |
@@ -26,12 +81,70 @@ Versions are strict `major.minor.patch`. The `release` job parses commit subject
 - `BREAKING CHANGE:` in a body → major
 - anything else → patch
 
+### Version bump decision (Mermaid)
+
+```mermaid
+flowchart TD
+  START([Parse commits since last release]) --> CHECK_BREAK{BREAKING CHANGE
+  or feat!?}
+  CHECK_BREAK -->|yes| MAJOR[major: X+1.0.0]
+  CHECK_BREAK -->|no| CHECK_FEAT{any feat: ?}
+  CHECK_FEAT -->|yes| MINOR[minor: X.Y+1.0]
+  CHECK_FEAT -->|no| PATCH[patch: X.Y.Z+1]
+  MAJOR --> WRITE[Prepend entry to CHANGELOG.md]
+  MINOR --> WRITE
+  PATCH --> WRITE
+  WRITE --> COMMIT["chore(release): X.Y.Z"]
+  COMMIT --> PUSH[push to dev-001]
+```
+
 ## Required secrets
 
-- `SONAR_TOKEN` — SonarQube Cloud token.
-- `PROMOTE_TOKEN` — GitHub PAT with `repo` and `workflow` scopes.
+| Secret | Used by | Description |
+| --- | --- | --- |
+| `GIT_PUSH_TOKEN` | release | PAT for pushing release commits. Scopes: `repo`, `workflow`. |
+| `PROMOTE_TOKEN` | promote | PAT that creates/merges promotion PRs. GITHUB_TOKEN PRs don't trigger checks. Scopes: `repo`, `workflow`. |
+| `SONAR_TOKEN` | security_checks | SonarQube Cloud analysis token. Optional — when absent, runs CodeQL-only SAST. |
+| `NOTIFICATION_ADDRESS` | pages | Recipient email for deployment notifications. |
+| `NOTIFICATION_HEADER` | pages | Email subject header for deployment notifications. |
+| `NOTIFICATION_ACTIVE` | pages | `"true"` to enable notifications, `"false"` to disable. |
 
 ## Repository settings
 
 - Enable GitHub Pages: **Settings → Pages → Source: GitHub Actions**.
+- Add `dev-001` and `main` as deployment branches in **Settings → Environments → github-pages**.
 - Protect `dev` and `main`; require the matching status checks before merge.
+
+### Deployment topology (PlantUML)
+
+```plantuml
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+
+cloud "GitHub" as GH {
+  rectangle "dev-001\n(working branch)" as dev001
+  rectangle "dev\n(staging)" as dev
+  rectangle "main\n(release)" as main
+  rectangle "GitHub Pages\n(Vite docs site)" as pages
+}
+
+rectangle "Runner" as runner {
+  rectangle "release job" as rls
+  rectangle "fast_checks job" as fc
+  rectangle "promote job" as prom
+  rectangle "security_checks job" as sec
+  rectangle "pages job" as pg
+}
+
+dev001 --> rls : push
+rls --> dev001 : release commit
+rls --> fc : needs release
+fc --> prom : needs fast_checks
+prom --> dev : merge PR (gate: Fast Checks)
+dev --> sec : PR trigger
+sec --> main : merge PR (gate: Security & Quality)
+main --> pg : push trigger
+pg --> pages : deploy
+@enduml
+```
