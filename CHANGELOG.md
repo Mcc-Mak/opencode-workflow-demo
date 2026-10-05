@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.4.0 (2026-10-05)
+
+### Added
+- deploy codebase to Pages, docbase to Wiki (0.4.0)
+
 ## 0.3.2 (2026-10-05)
 
 ### Fixed

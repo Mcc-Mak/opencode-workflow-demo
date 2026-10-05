@@ -4,9 +4,4 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   base: "/opencode-workflow-demo/",
-  server: {
-    fs: {
-      allow: [".."],
-    },
-  },
 });
