@@ -72,11 +72,12 @@ participant "dev-001" as G
 participant "CI/CD" as CI
 
 U -> C : 1. Capture requirement
-U -> C : 2. Implement
-U -> D : 3. Document
-U -> CL : 4. Update changelog
-U -> G : 5. Commit + push
-G -> CI : 6. Pipeline runs
+U -> G : 2. Plan & track (backlog, items, tasklist)
+U -> C : 3. Implement
+U -> D : 4. Document
+U -> CL : 5. Update changelog
+U -> G : 6. Commit + push
+G -> CI : 7. Pipeline runs
 CI -> CI : release → fast_checks → promote
 CI -> CI : → security_checks → pages + wiki
 @enduml
