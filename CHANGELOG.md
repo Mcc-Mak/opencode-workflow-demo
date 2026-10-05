@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.1.2 (2026-10-05)
+
+### Other
+- feat(ci): add .env-driven secret auto-config script (0.2.0)
+
 ## 0.1.1 (2026-10-05)
 
 ### Other
