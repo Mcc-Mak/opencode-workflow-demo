@@ -1,7 +1,13 @@
 # opencode-workflow-demo
 
-> **GitHub Pages Entrypoint:** <https://mcc-mak.github.io/opencode-workflow-demo/>
-
+> **GitHub Pages:**
+>
+> | Path | URL |
+> | --- | --- |
+> | Docs site (Vite) | <https://mcc-mak.github.io/opencode-workflow-demo/> |
+> | `docbase/` | <https://mcc-mak.github.io/opencode-workflow-demo/docbase/> |
+> | `codebase/` | <https://mcc-mak.github.io/opencode-workflow-demo/codebase/> |
+>
 > **Full documentation index:** [`docbase/TOCTREE.md`](docbase/TOCTREE.md)
 
 A standard template for OpenCode projects: a coding workflow, a progressive GitHub Actions CI/CD pipeline, and strict semantic versioning. The contents of `codebase/` are project-specific; everything else is reusable infrastructure.
