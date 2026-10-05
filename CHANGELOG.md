@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.1.6 (2026-10-05)
+
+### Other
+- fix(ci): close stale PRs before creating fresh ones (0.1.6)
+
 ## 0.1.5 (2026-10-05)
 
 ### Other
