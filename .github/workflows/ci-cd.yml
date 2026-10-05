@@ -456,23 +456,19 @@ jobs:
               exit 1
             fi
 
-            echo "Watching '${gate}' check on PR #${pr_number}..."
-            # Poll only OUR gate check — not all checks. Third-party App
-            # checks (e.g. SonarCloud's own "SonarCloud Code Analysis",
-            # GitGuardian) post independent statuses that may fail without
-            # reflecting our pipeline gates. Only the named gate job decides
-            # whether this hop is allowed to merge.
-            state=""
-            for i in $(seq 1 120); do
-              state=$(gh pr checks "$pr_number" --json name,state \
-                --jq ".[] | select(.name==\"${gate}\") | .state" 2>/dev/null || echo "")
-              if [ -n "$state" ] && [ "$state" != "pending" ] && [ "$state" != "skipping" ]; then
-                break
-              fi
-              sleep 10
-            done
+            echo "Waiting for checks on PR #${pr_number} to settle..."
+            # --watch blocks until all checks reach a terminal state. We
+            # ignore its exit code because third-party App checks (e.g.
+            # SonarCloud's own "SonarCloud Code Analysis", GitGuardian) may
+            # fail independently — only our named gate job decides whether
+            # this hop may merge.
+            gh pr checks "$pr_number" --watch || true
+
+            state=$(gh pr checks "$pr_number" --json name,state \
+              --jq ".[] | select(.name==\"${gate}\") | .state" 2>/dev/null \
+              | tr '[:upper:]' '[:lower:]' || echo "")
             echo "  '${gate}' final state: ${state:-unknown}"
-            if [ "$state" != "pass" ]; then
+            if [ "$state" != "pass" ] && [ "$state" != "success" ]; then
               echo "::error::'${gate}' check did not pass (state: ${state:-unknown}) on PR #${pr_number} (${head} → ${base})"
               exit 1
             fi
