@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.6.4 (2026-10-05)
+
+### Other
+- fix(security): resolve 4 SonarCloud vulnerabilities + fail-closed QG + branch attribution (0.5.4)
+
 ## 0.6.3 (2026-10-05)
 
 ### Other
