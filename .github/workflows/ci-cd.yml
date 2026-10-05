@@ -545,10 +545,11 @@ jobs:
   #    source of truth; the wiki is a generated mirror (force-with-lease
   #    push keeps it in sync).
   #
-  #    The wiki is a separate git repo at {repo}.wiki.git. If it does not
-  #    exist yet (no page ever created), the job bootstraps it by pushing
-  #    a fresh local repo to that URL — no manual UI initialization needed.
-  #    Reuses PROMOTE_TOKEN (repo scope covers the wiki repo).
+  #    The wiki is a separate git repo at {repo}.wiki.git. GitHub does not
+  #    create this repo until the first page is saved through the web UI
+  #    (there is no API to bootstrap it). Until then the job prints a
+  #    notice and exits 0 so it does not block the rest of the pipeline;
+  #    once initialized, subsequent runs sync normally. Reuses PROMOTE_TOKEN.
   # =========================================================================
   wiki:
     name: Sync Docs to GitHub Wiki
@@ -580,17 +581,17 @@ jobs:
           wiki_url="https://x-access-token:${GH_TOKEN}@github.com/${repo_full}.wiki.git"
           wiki_dir="$(mktemp -d)"
 
-          # Clone the wiki repo. If the clone fails (wiki not yet
-          # initialized), bootstrap a fresh local repo and push to create it.
-          if git clone --depth 1 "$wiki_url" "$wiki_dir" 2>/dev/null; then
-            # Existing wiki — wipe content (keep .git); docbase is source of truth.
-            find "$wiki_dir" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-          else
-            echo "Wiki repo not found — bootstrapping from docbase/..."
-            rm -rf "$wiki_dir"
-            git init -q -b main "$wiki_dir"
-            git -C "$wiki_dir" remote add origin "$wiki_url"
+          # Clone the wiki repo. GitHub does not create the .wiki.git
+          # repository until the first page is saved through the web UI.
+          # Until then, print a notice and exit 0 so the pipeline is not
+          # blocked; once initialized, subsequent runs sync normally.
+          if ! git clone --depth 1 "$wiki_url" "$wiki_dir" 2>/dev/null; then
+            echo "::warning::Wiki repo not found for ${repo_full}. GitHub does not create the .wiki.git repo until the first page is saved through the web UI. Open https://github.com/${repo_full}/wiki, create any page once, then re-run this workflow. The pipeline is not blocked — pages deployment succeeded independently."
+            exit 0
           fi
+
+          # Existing wiki — wipe content (keep .git); docbase is source of truth.
+          find "$wiki_dir" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
 
           # Copy TOCTREE and the docs (preserving the docs/ subpath).
           cp docbase/TOCTREE.md "$wiki_dir/TOCTREE.md"
@@ -616,9 +617,8 @@ jobs:
           echo "Staged wiki pages:"
           (cd "$wiki_dir" && find . -name '*.md' ! -path './.git/*' | sort)
 
-          # Commit + push. force-with-lease makes re-runs idempotent on an
-          # existing wiki (docbase is authoritative). For a first-time push
-          # (no remote refs yet), use a plain push — the remote is empty.
+          # Commit + push. force-with-lease makes re-runs idempotent if the
+          # wiki history diverged (docbase/ is authoritative).
           short_sha="$(git rev-parse --short HEAD)"
           git -C "$wiki_dir" add -A
           if git -C "$wiki_dir" diff --cached --quiet; then
@@ -628,9 +628,5 @@ jobs:
           git -C "$wiki_dir" -c user.name="github-actions[bot]" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -m "docs: sync wiki from docbase@${short_sha}"
-          if git -C "$wiki_dir" ls-remote -h origin 2>/dev/null | grep -q .; then
-            git -C "$wiki_dir" push --force-with-lease origin HEAD
-          else
-            git -C "$wiki_dir" push origin HEAD
-          fi
+          git -C "$wiki_dir" push --force-with-lease origin HEAD
           echo "Wiki synced."
