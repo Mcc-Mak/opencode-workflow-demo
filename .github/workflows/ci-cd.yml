@@ -598,21 +598,22 @@ jobs:
           cp docbase/TOCTREE.md "$wiki_dir/TOCTREE.md"
           cp docbase/docs/*.md "$wiki_dir/"
 
-          # Minimal landing page that points to the index.
-          cat > "$wiki_dir/Home.md" <<'EOF'
-          # opencode-workflow-demo
-
-          Project documentation is indexed in [TOCTREE](TOCTREE).
-          EOF
+          # Landing page: README.md becomes Home.md (wiki root).
+          cp README.md "$wiki_dir/Home.md"
 
           # The sidebar mirrors TOCTREE so navigation renders on every page.
           cp docbase/TOCTREE.md "$wiki_dir/_Sidebar.md"
 
-          # Rewrite intra-doc links: docs/X.md -> X (GitHub Wiki resolves
-          # pages by filename, no subdirectory or .md suffix). Runs over
-          # every staged markdown file.
+          # Rewrite intra-doc links for wiki resolution (pages resolve by
+          # filename — no subdirectory or .md suffix). Handles all forms
+          # found in README.md and the docs: docbase/docs/X.md, docbase/Y.md,
+          # and docs/X.md. Runs over every staged markdown file.
           while IFS= read -r -d '' f; do
-            sed -i -E 's|\(docs/([A-Za-z0-9_.-]+)\.md\)|(\1)|g' "$f"
+            sed -i -E \
+              -e 's|\(docbase/docs/([A-Za-z0-9_.-]+)\.md\)|(\1)|g' \
+              -e 's|\(docbase/([A-Za-z0-9_.-]+)\.md\)|(\1)|g' \
+              -e 's|\(docs/([A-Za-z0-9_.-]+)\.md\)|(\1)|g' \
+              "$f"
           done < <(find "$wiki_dir" -name '*.md' -print0)
 
           echo "Staged wiki pages:"
