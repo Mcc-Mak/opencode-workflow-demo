@@ -55,7 +55,7 @@ flowchart LR
 
 ## Workflow
 
-Every change follows six steps (see `AGENTS.md`): capture the requirement → implement in `codebase/` → document in `docbase/` → update `CHANGELOG.md` → commit to `dev-001` → CI/CD runs.
+Every change follows seven steps (see `AGENTS.md`): capture the requirement → plan & track (manage issues, labels, milestones as project manager) → implement in `codebase/` → document in `docbase/` → update `CHANGELOG.md` → commit to `dev-001` → CI/CD runs.
 
 ### Workflow steps (PlantUML)
 
