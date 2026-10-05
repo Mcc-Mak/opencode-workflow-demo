@@ -67,7 +67,7 @@ wf --> cl : version bump
 @enduml
 ```
 
-- **Service** — containerised application defined by the multi-stage `Dockerfile` (a `node` stage builds the Vite app, an `nginx` stage serves `dist/`) + `docker-compose.yml`; ports and NIC come from `.env`.
+- **Service** — containerised application defined by the multi-stage `Dockerfile` (a `node` stage builds the Vite app, an `nginx` stage serves `dist/` as the non-root `nginx` user via a custom `nginx.conf` on port 8080) + `docker-compose.yml`; ports and NIC come from `.env`.
 - **App site** — React + Vite SPA in `codebase/site/`, deployed to GitHub Pages. The container and Pages ship an identical `dist/` artifact.
 - **Documentation** — markdown-only `docbase/`, published to the GitHub Wiki by the `wiki` job.
 - **Pipeline** — six-job workflow (`release → fast_checks → promote → security_checks → pages + wiki`) that progressively promotes code from `dev-001` to GitHub Pages (app) and the GitHub Wiki (docs).

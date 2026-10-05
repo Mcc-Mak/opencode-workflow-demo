@@ -18,6 +18,10 @@ Maps each requirement to its implementation and tests.
 | FR-012 | Non-blocking wiki when uninitialized | `.github/workflows/ci-cd.yml` `wiki` job | CI: delete wiki, push to `main`, confirm pipeline succeeds with warning. |
 | FR-013 | Secret auto-configuration | `scripts/configure-secrets.sh` | Manual: run script, confirm secrets appear in GitHub Settings → Secrets. |
 | FR-014 | Multi-stage Dockerfile | `codebase/Dockerfile` | Manual: `docker compose up --build`, confirm app served on port 8080. |
+| FR-015 | Non-root nginx container | `codebase/Dockerfile` (`USER nginx`), `codebase/nginx.conf` | Manual: `docker compose up --build`, confirm nginx process runs as `nginx` user (`docker exec <container> ps aux`). |
+| FR-016 | `npm ci --ignore-scripts` | `codebase/Dockerfile`, `.github/workflows/ci-cd.yml` | CI: confirm build succeeds with `--ignore-scripts` flag in logs. |
+| FR-017 | SHA-pinned third-party actions | `.github/workflows/ci-cd.yml` | CI: confirm SonarSource action uses full SHA, not `@v8`. |
+| FR-018 | Fail-closed SonarQube QG | `.github/workflows/ci-cd.yml` `security_checks` job | CI: with `SONAR_TOKEN` and ERROR status, confirm pipeline fails. |
 | NFR-001 | Identical `dist/` (container vs Pages) | `codebase/Dockerfile` + `pages` job | Manual: compare `dist/` hash from container build and Pages artifact. |
 | NFR-002 | No secrets committed | `.gitignore` | CI: confirm `.env` is gitignored; scan history for leaked tokens. |
 | NFR-003 | PAT-based promotion | `.github/workflows/ci-cd.yml` `promote` job | CI: confirm PRs created by `PROMOTE_TOKEN` trigger gate workflows. |
@@ -25,3 +29,4 @@ Maps each requirement to its implementation and tests.
 | NFR-005 | Parallel pages + wiki | `.github/workflows/ci-cd.yml` job dependencies | CI: confirm `pages` and `wiki` run concurrently on `main` push. |
 | NFR-006 | Git tags for releases | `git tag` | Manual: `git tag -l` confirms annotated tags for each version. |
 | NFR-007 | Replaceable `codebase/` | Template structure | Manual: replace `codebase/`, confirm pipeline still works. |
+| NFR-008 | Non-root container | `codebase/Dockerfile` | Manual: `docker exec <container> whoami` returns `nginx`, not `root`. |

@@ -5,5 +5,5 @@ services:
       dockerfile: Dockerfile
     image: opencode-workflow-demo:${IMAGE_TAG:-latest}
     ports:
-      - "${NIC:-127.0.0.1}:${PORT:-8080}:80"
+      - "${NIC:-127.0.0.1}:${PORT:-8080}:8080"
     restart: unless-stopped
