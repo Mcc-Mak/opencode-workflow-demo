@@ -123,7 +123,6 @@ What you need before filling in `.env`:
 - **`NOTIFICATION_ACTIVE`** — `true` to enable, `false` to disable.
 - GitHub Pages source set to **GitHub Actions** (the script does this; or set it manually under Settings → Pages).
 - `dev-001` registered as a deployment branch in **Settings → Environments → github-pages** (the script does this too).
-- GitHub Wiki initialized once: open **{repo}/wiki** in the browser and create the first page (one-time manual prerequisite for the `wiki` job).
 
 Real `.env` is gitignored — never commit it.
 

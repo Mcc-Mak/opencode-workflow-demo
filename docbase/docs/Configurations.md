@@ -61,5 +61,5 @@ The multi-stage `codebase/Dockerfile` runs the same Vite build (`npm ci && npm r
 
 - The `wiki` job clones `{repo}.wiki.git`, copies `docbase/TOCTREE.md` and `docbase/docs/*.md` (preserving the `docs/` subpath), generates a minimal `Home.md` and a `_Sidebar.md` (from `TOCTREE.md`), rewrites `docs/X.md` links to `docs/X` for wiki resolution, and pushes with `--force-with-lease` (docbase is the source of truth).
 - It reuses `PROMOTE_TOKEN` (its `repo` scope covers the wiki repo).
-- **One-time prerequisite:** the wiki must be initialized via the GitHub UI (open `{repo}/wiki` and create the first page). Until then the `.wiki.git` repository does not exist and the `wiki` job fails closed with a pointer to that URL.
+- **First run:** if the `.wiki.git` repository does not exist yet, the job bootstraps it by pushing a fresh local repo — no manual UI page creation needed.
 - Wiki-side edits made through the browser are overwritten on the next sync; edit `docbase/` instead.
