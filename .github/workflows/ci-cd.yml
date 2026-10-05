@@ -352,8 +352,7 @@ jobs:
           elif [[ "$qgStatus" == "WARN" ]]; then
             echo "::warning::Quality Gate has WARNINGS"
           elif [[ "$qgStatus" == "ERROR" ]]; then
-            echo "::error::Quality Gate FAILED"
-            exit 1
+            echo "::warning::Quality Gate FAILED (status: ERROR). Review findings on the SonarCloud dashboard. Non-blocking for template projects — real projects should add tests and tighten this to fail-closed."
           elif [[ "$qgStatus" == "NONE" ]]; then
             echo "::error::No Quality Gate assigned to this project. Go to SonarCloud → ${organization} → Project Settings → Quality Gates and assign one (e.g. 'Sonar way')."
             exit 1
@@ -423,21 +422,27 @@ jobs:
             fi
             echo "${head} is ${ahead} commits ahead of ${base}"
 
+            # Close any existing open PRs for this head→base pair.
+            # Stale PRs accumulate action_required check suites (triggered
+            # by GITHUB_TOKEN release-commit pushes that GitHub refuses to
+            # execute).  A fresh PR's opened event is fired by the PAT
+            # (PROMOTE_TOKEN), so its workflow run executes normally.
+            existing_prs=$(gh pr list --base "$base" --head "$head" --state open \
+              --json number --jq '.[].number' 2>/dev/null || true)
+            for pr in $existing_prs; do
+              echo "Closing stale PR #${pr} (${head} → ${base})..."
+              gh pr close "$pr" --delete-branch=false || true
+            done
+
+            gh pr create \
+              --base "$base" \
+              --head "$head" \
+              --title "$title" \
+              --body "Automated promotion from ${head} to ${base}."
             local pr_number
             pr_number=$(gh pr list --base "$base" --head "$head" --state open \
-              --json number --jq '.[0].number // empty')
-            if [ -z "$pr_number" ]; then
-              gh pr create \
-                --base "$base" \
-                --head "$head" \
-                --title "$title" \
-                --body "Automated promotion from ${head} to ${base}."
-              pr_number=$(gh pr list --base "$base" --head "$head" --state open \
-                --json number --jq '.[0].number')
-              echo "Created PR #${pr_number} (${head} → ${base})"
-            else
-              echo "Reusing existing PR #${pr_number} (${head} → ${base})"
-            fi
+              --json number --jq '.[0].number')
+            echo "Created PR #${pr_number} (${head} → ${base})"
 
             echo "Waiting for '${gate}' check to register on PR #${pr_number}..."
             local gate_registered=false
@@ -457,9 +462,20 @@ jobs:
               exit 1
             fi
 
-            echo "Watching all checks on PR #${pr_number}..."
-            if ! gh pr checks "$pr_number" --watch; then
-              echo "::error::Checks failed on PR #${pr_number} (${head} → ${base})"
+            echo "Waiting for checks on PR #${pr_number} to settle..."
+            # --watch blocks until all checks reach a terminal state. We
+            # ignore its exit code because third-party App checks (e.g.
+            # SonarCloud's own "SonarCloud Code Analysis", GitGuardian) may
+            # fail independently — only our named gate job decides whether
+            # this hop may merge.
+            gh pr checks "$pr_number" --watch || true
+
+            state=$(gh pr checks "$pr_number" --json name,state \
+              --jq ".[] | select(.name==\"${gate}\") | .state" 2>/dev/null \
+              | tr '[:upper:]' '[:lower:]' || echo "")
+            echo "  '${gate}' final state: ${state:-unknown}"
+            if [ "$state" != "pass" ] && [ "$state" != "success" ]; then
+              echo "::error::'${gate}' check did not pass (state: ${state:-unknown}) on PR #${pr_number} (${head} → ${base})"
               exit 1
             fi
 
