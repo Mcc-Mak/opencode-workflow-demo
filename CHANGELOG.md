@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.2.0 (2026-10-05)
+
+### Added
+- add notification secrets, GIT_PUSH_TOKEN, Mermaid/PlantUML docs (0.2.0)
+
 ## 0.1.6 (2026-10-05)
 
 ### Other
