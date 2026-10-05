@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.6.3 (2026-10-05)
+
+### Other
+- docs: fill template placeholders — Charter, Stories, PRD, SRS, RTM, CRM (0.5.3)
+
 ## 0.6.2 (2026-10-05)
 
 ### Fixed
