@@ -228,18 +228,26 @@ jobs:
         with:
           fetch-depth: 0 # Pulls full git history for accurate Sonar attribution
 
-      # 0. Fail fast with a clear message if required secrets are missing.
-      - name: Verify required secrets
+      # 0. Detect whether SonarQube Cloud is configured. Sonar is optional:
+      # when SONAR_TOKEN is absent, the job runs CodeQL only (still a hard
+      # SAST gate) and emits a notice. When the token IS present, Sonar runs
+      # and its Quality Gate fails closed. This lets the pipeline promote
+      # dev->main without forcing a SonarCloud setup, while preserving
+      # fail-closed behavior whenever Sonar is actually in use.
+      - name: Check Sonar configuration
+        id: check_sonar
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "${SONAR_TOKEN:-}" ]; then
-            echo "::error::SONAR_TOKEN secret is not set. Create a SonarQube Cloud token (SonarCloud → My Account → Security) and add it as the SONAR_TOKEN repository secret."
-            exit 1
+            echo "::notice::SONAR_TOKEN not set — running CodeQL-only SAST gate. To enable SonarQube Cloud, create a token and add it as the SONAR_TOKEN repository secret."
+            echo "has_sonar=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_sonar=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # 1. Native GitHub CodeQL Scan (SAST)
+      # 1. Native GitHub CodeQL Scan (SAST) — MANDATORY hard gate.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
@@ -252,8 +260,9 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
 
-      # 2. SonarQube Cloud Scan (SCA + Quality + Code Smells)
+      # 2. SonarQube Cloud Scan (SCA + Quality + Code Smells) — only when configured.
       - name: SonarQube Cloud Scan
+        if: steps.check_sonar.outputs.has_sonar == 'true'
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -265,6 +274,7 @@ jobs:
       #    organization parameter required by SonarCloud for project-scoped
       #    tokens.
       - name: SonarQube Quality Gate Check
+        if: steps.check_sonar.outputs.has_sonar == 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
