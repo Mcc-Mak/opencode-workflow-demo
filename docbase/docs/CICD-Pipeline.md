@@ -76,7 +76,7 @@ sequenceDiagram
 | --- | --- | --- |
 | `dev-001` push | `release` | Bump version (`major.minor.patch`) from conventional commits and update `CHANGELOG.md`. |
 | `dev-001` → `dev` | `fast_checks` | Validate compose, build the image, lint. Gates the promotion PR. |
-| `dev` → `main` | `security_checks` | CodeQL (SAST) + SonarQube Cloud (SCA + quality gate). Fails closed on findings. |
+| `dev` → `main` | `security_checks` | CodeQL (SAST) + SonarQube Cloud (SCA + quality gate). Fails closed on findings. The SonarQube Quality Gate check exits 1 on ERROR status (fail-closed) when `SONAR_TOKEN` is configured; skipped with a notice when absent. Third-party actions are pinned to full commit SHAs. |
 | `main` → Pages | `pages` | Build the React + Vite application (`codebase/site/`) and deploy to GitHub Pages. |
 | `main` → Wiki | `wiki` | Sync `docbase/` markdown to the GitHub Wiki. Runs in parallel with `pages`. Non-blocking: warns and skips if the wiki is not yet initialized (needs one-time UI page creation). |
 

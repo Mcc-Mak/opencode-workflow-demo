@@ -53,7 +53,7 @@ flowchart TB
 
 The React + Vite application (`codebase/site/`) is deployed to GitHub Pages at the path matching the repository name (`/opencode-workflow-demo/`). If you rename the repo, update `base` in `codebase/site/vite.config.ts`.
 
-The multi-stage `codebase/Dockerfile` runs the same Vite build (`npm ci && npm run build`) in a `node` stage and serves the resulting `dist/` from an `nginx` stage. The container and the Pages deploy therefore ship an identical artifact.
+The multi-stage `codebase/Dockerfile` runs the same Vite build (`npm ci --ignore-scripts && npm run build`) in a `node` stage and serves the resulting `dist/` from an `nginx` stage. The nginx stage uses a custom `codebase/nginx.conf` (listening on port 8080) and runs as the non-root `nginx` user (`USER nginx`). The container and the Pages deploy therefore ship an identical artifact.
 
 ## Documentation (GitHub Wiki)
 
