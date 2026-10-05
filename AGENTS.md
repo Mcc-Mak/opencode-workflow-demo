@@ -59,7 +59,7 @@ The pipeline has progressive stages, one per promotion hop:
 - **`dev-001` → `dev`**: `fast_checks` job — validate compose, build the image, lint. Gates this hop.
 - **`dev` → `main`**: `security_checks` job — **CodeQL** (SAST, mandatory hard gate) + **SonarQube Cloud** (quality gate, fail-closed when `SONAR_TOKEN` is configured; skipped with a notice when absent). This hop fails closed on findings.
 - **`main` → GitHub Pages**: `pages` job — build the **React + Vite** app (`codebase/site/`) and deploy to Pages.
-- **`main` → GitHub Wiki**: `wiki` job — publish `docbase/` markdown to the repository's GitHub Wiki. Runs in parallel with `pages`. Reuses `PROMOTE_TOKEN`; bootstraps the wiki on first run (no manual UI initialization needed).
+- **`main` → GitHub Wiki**: `wiki` job — publish `docbase/` markdown to the repository's GitHub Wiki. Runs in parallel with `pages`. Reuses `PROMOTE_TOKEN`. GitHub does not create the `.wiki.git` repo until the first page is saved through the web UI; until then the job warns and exits 0 (non-blocking — does not fail the pipeline).
 
 Promotion is driven by the `promote` job, which opens PRs `dev-001 → dev` and `dev → main` and merges each only after its gate check passes. It uses `PROMOTE_TOKEN` (a PAT) so the PRs trigger the gate workflow runs.
 

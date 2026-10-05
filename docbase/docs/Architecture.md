@@ -126,7 +126,8 @@ end note
 
 note right of wiki
   Reuses PROMOTE_TOKEN
-  Bootstraps on first run
+  Needs one-time UI init
+  Non-blocking until then
 end note
 @enduml
 ```
