@@ -526,6 +526,24 @@ jobs:
         working-directory: docbase/site
         run: npm run build
 
+      - name: Stage docbase/ and codebase/ for Pages
+        run: |
+          set -euo pipefail
+          # Copy docbase/ (excluding site/ source) and codebase/ into the
+          # Vite build output so they are served at:
+          #   /{ProjectName}/docbase/  and  /{ProjectName}/codebase/
+          dist="docbase/site/dist"
+          mkdir -p "$dist/docbase" "$dist/codebase"
+
+          # docbase/ minus site/ (Vite source — already built into dist/)
+          rsync -a --exclude='site/' docbase/ "$dist/docbase/"
+
+          # codebase/ as-is (.env is gitignored so won't be present)
+          rsync -a codebase/ "$dist/codebase/"
+
+          echo "Staged directories:"
+          ls -la "$dist"
+
       - name: Setup Pages
         uses: actions/configure-pages@v6
 

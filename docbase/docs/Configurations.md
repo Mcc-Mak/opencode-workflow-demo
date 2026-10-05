@@ -52,3 +52,8 @@ flowchart TB
 ## Docs site
 
 The GitHub Pages site (`docbase/site/`) deploys at the path matching the repository name. If you rename the repo, update `base` in `docbase/site/vite.config.ts`.
+
+In addition to the Vite docs site, the raw `docbase/` and `codebase/` directories are staged into the Pages artifact so they are browseable at:
+
+- `/{ProjectName}/docbase/` — all documentation source (markdown, TOCTREE)
+- `/{ProjectName}/codebase/` — all implementation source (Dockerfile, compose, .env.example)

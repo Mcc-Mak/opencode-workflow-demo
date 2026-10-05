@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.3.0 (2026-10-05)
+
+### Added
+- deploy docbase/ and codebase/ to GitHub Pages subpaths (0.3.0)
+
 ## 0.2.0 (2026-10-05)
 
 ### Added
