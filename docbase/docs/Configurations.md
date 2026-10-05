@@ -24,7 +24,7 @@ The script pushes each value into GitHub's secret store with `gh secret set` and
 | Secret | Used by | Description |
 | --- | --- | --- |
 | `PROMOTE_TOKEN` | auto-promote | PAT that creates/merges promotion PRs (GITHUB_TOKEN PRs do not trigger checks). Scopes: `repo`, `workflow`. |
-| `SONAR_TOKEN` | security gate | SonarQube Cloud analysis token. |
+| `SONAR_TOKEN` | security gate | SonarQube Cloud analysis token. Optional — when absent, the dev→main gate runs CodeQL-only SAST; when present, Sonar runs and fails closed on its quality gate. |
 
 ## Docs site
 

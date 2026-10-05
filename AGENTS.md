@@ -57,12 +57,12 @@ The pipeline has progressive stages, one per promotion hop:
 
 - **`dev-001` push** — `release` job bumps the version and updates `CHANGELOG.md` from conventional commits (runs before promotion).
 - **`dev-001` → `dev`**: `fast_checks` job — validate compose, build the image, lint. Gates this hop.
-- **`dev` → `main`**: `security_checks` job — **CodeQL** (SAST) + **SonarQube Cloud** (quality gate). This hop must fail closed on findings.
+- **`dev` → `main`**: `security_checks` job — **CodeQL** (SAST, mandatory hard gate) + **SonarQube Cloud** (quality gate, fail-closed when `SONAR_TOKEN` is configured; skipped with a notice when absent). This hop fails closed on findings.
 - **`main` → GitHub Pages**: `pages` job — build the **React + Vite** site (`docbase/site/`) and deploy to Pages.
 
 Promotion is driven by the `promote` job, which opens PRs `dev-001 → dev` and `dev → main` and merges each only after its gate check passes. It uses `PROMOTE_TOKEN` (a PAT) so the PRs trigger the gate workflow runs.
 
-When editing workflows, preserve the stage boundaries and the SonarQube/CodeQL gates on the `dev → main` hop.
+When editing workflows, preserve the stage boundaries and the CodeQL hard gate on the `dev → main` hop. SonarQube Cloud runs (and fails closed) when `SONAR_TOKEN` is configured; it is skipped when absent.
 
 ## Conventions
 
