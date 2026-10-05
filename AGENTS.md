@@ -4,7 +4,7 @@ Compact guidance for OpenCode sessions working in this repo. Read before editing
 
 ## Repository purpose
 
-A reusable template for OpenCode projects: a six-step coding workflow, a progressive GitHub Actions CI/CD pipeline, and strict semantic versioning. The contents of `codebase/` are project-specific; everything else (`AGENTS.md`, `docbase/`, the workflow, versioning) is reusable infrastructure. Use this repo as a template and replace `codebase/` per project.
+A reusable template for OpenCode projects: a seven-step coding workflow, a progressive GitHub Actions CI/CD pipeline, and strict semantic versioning. The contents of `codebase/` are project-specific; everything else (`AGENTS.md`, `docbase/`, the workflow, versioning) is reusable infrastructure. Use this repo as a template and replace `codebase/` per project.
 
 ## Layout
 
@@ -30,19 +30,20 @@ When adding a doc, also add it to `docbase/TOCTREE.md`. When adding an env var, 
 
 ## Workflow (follow in order)
 
-Every task follows these 6 steps, in order:
+Every task follows these 7 steps, in order:
 
 1. **User Requirement** — capture the ask before coding.
-2. **Implement** into `codebase/{.env.example,docker-compose.yml,Dockerfile.*}`. Ports and NIC come from `.env`.
-3. **Document** into `docbase/` (all files listed above, TOCTREE updated). CRM must reflect new/changed requirements.
-4. **Update `CHANGELOG.md`** — add entry with version `major.minor.patch`.
-5. **Git** — commit to branch `dev-001`:
+2. **Plan & Track** — act as project manager before implementing. Create or update GitHub issues for the work (one issue per distinct unit), and manage labels, milestones, tags, and the project board to reflect current state. Open new issues for work discovered during planning; close issues only when the work is verifiably complete. Use `gh` for all issue/project operations. **Never perform a destructive action** (closing or reopening issues, deleting labels/milestones/tags, removing board items) without explicit confirmation — pause and ask first.
+3. **Implement** into `codebase/{.env.example,docker-compose.yml,Dockerfile.*}`. Ports and NIC come from `.env`.
+4. **Document** into `docbase/` (all files listed above, TOCTREE updated). CRM must reflect new/changed requirements.
+5. **Update `CHANGELOG.md`** — add entry with version `major.minor.patch`.
+6. **Git** — commit to branch `dev-001`:
    - Subject includes the version: `major.minor.patch` (e.g. `<scope>: ... (0.1.0)`)
    - Body explains the what and why
    - Push `dev-001` to `origin/dev-001`. Do **not** push to `dev` or `main` manually.
-6. **CI/CD** runs automatically (see below).
+7. **CI/CD** runs automatically (see below).
 
-Do not skip steps 3–4. Implementation without docs + changelog is incomplete.
+Do not skip steps 4–5. Implementation without docs + changelog is incomplete.
 
 ## Git & branching
 
