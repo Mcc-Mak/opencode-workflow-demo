@@ -126,7 +126,7 @@ end note
 
 note right of wiki
   Reuses PROMOTE_TOKEN
-  One-time wiki init required
+  Bootstraps on first run
 end note
 @enduml
 ```
