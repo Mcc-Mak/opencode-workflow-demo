@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.1.4 (2026-10-05)
+
+### Other
+- fix(ci): non-blocking Sonar QG + targeted check watching (0.1.4)
+
 ## 0.1.3 (2026-10-05)
 
 ### Other
