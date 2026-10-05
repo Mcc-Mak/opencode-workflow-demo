@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.6.0 (2026-10-05)
+
+### Added
+- add Plan & Track step to workflow (seven-step, 0.4.5)
+
 ## 0.5.0 (2026-10-05)
 
 ### Added
