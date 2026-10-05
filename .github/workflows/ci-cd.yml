@@ -422,21 +422,27 @@ jobs:
             fi
             echo "${head} is ${ahead} commits ahead of ${base}"
 
+            # Close any existing open PRs for this head→base pair.
+            # Stale PRs accumulate action_required check suites (triggered
+            # by GITHUB_TOKEN release-commit pushes that GitHub refuses to
+            # execute).  A fresh PR's opened event is fired by the PAT
+            # (PROMOTE_TOKEN), so its workflow run executes normally.
+            existing_prs=$(gh pr list --base "$base" --head "$head" --state open \
+              --json number --jq '.[].number' 2>/dev/null || true)
+            for pr in $existing_prs; do
+              echo "Closing stale PR #${pr} (${head} → ${base})..."
+              gh pr close "$pr" --delete-branch=false || true
+            done
+
+            gh pr create \
+              --base "$base" \
+              --head "$head" \
+              --title "$title" \
+              --body "Automated promotion from ${head} to ${base}."
             local pr_number
             pr_number=$(gh pr list --base "$base" --head "$head" --state open \
-              --json number --jq '.[0].number // empty')
-            if [ -z "$pr_number" ]; then
-              gh pr create \
-                --base "$base" \
-                --head "$head" \
-                --title "$title" \
-                --body "Automated promotion from ${head} to ${base}."
-              pr_number=$(gh pr list --base "$base" --head "$head" --state open \
-                --json number --jq '.[0].number')
-              echo "Created PR #${pr_number} (${head} → ${base})"
-            else
-              echo "Reusing existing PR #${pr_number} (${head} → ${base})"
-            fi
+              --json number --jq '.[0].number')
+            echo "Created PR #${pr_number} (${head} → ${base})"
 
             echo "Waiting for '${gate}' check to register on PR #${pr_number}..."
             local gate_registered=false
