@@ -13,13 +13,13 @@ Code and docs are strictly separated. Do not mix them.
 - `codebase/` — all implementation (project-specific; replace per project)
   - `.env.example` — every env var (PORT, NIC, image tag, etc.) with safe defaults
   - `docker-compose.yml` — compose that reads env for ports + NIC
-  - `Dockerfile` / `Dockerfile.*` — one or more Dockerfiles (e.g. `Dockerfile.opencode`)
-- `docbase/` — all documentation
-  - `TOCTREE.md` — index linking every doc below
+  - `Dockerfile` / `Dockerfile.*` — one or more Dockerfiles (e.g. `Dockerfile.opencode`). The default `Dockerfile` is multi-stage: a `node` stage builds the Vite app, an `nginx` stage serves `dist/`.
+  - `site/` — React + Vite application, built and deployed to GitHub Pages on push to `main` (the same `dist/` is produced by the multi-stage `Dockerfile`, so container and Pages deploy an identical artifact)
+- `docbase/` — all documentation (markdown only; published to the GitHub Wiki on push to `main`)
+  - `TOCTREE.md` — index linking every doc below (also drives the wiki `TOCTREE` page and `_Sidebar.md`)
   - `docs/ProjectCharter.md`, `UserStories.md`, `PRD.md`, `SRS.md`, `PDR.md`, `ADR.md`,
     `Architecture.md`, `API.md`, `Schema.md`, `ERD.md`, `QuickStart.md`,
     `Configurations.md`, `CICD-Pipeline.md`, `RTM.md`, `CRM.md`
-  - `site/` — React + Vite docs site, built and deployed to GitHub Pages on push to `main`
   - **CRM** = Cross-Reference Matrix (maps requirements → docs → tests). Keep it updated when requirements change.
 - `CHANGELOG.md` (repo root) — one entry per change, versioned `major.minor.patch`
 - `.env.example` (repo root) — documents CI/CD secrets (`PROMOTE_TOKEN`, `SONAR_TOKEN`); copy to gitignored `.env` and run `scripts/configure-secrets.sh`
@@ -48,7 +48,7 @@ Do not skip steps 3–4. Implementation without docs + changelog is incomplete.
 
 - Working branch is always **`dev-001`**. Commit and push there only.
 - Promotion is automated by GitHub Actions, not manual:
-  `origin/dev-001` → `origin/dev` → `origin/main` → **GitHub Pages**
+  `origin/dev-001` → `origin/dev` → `origin/main` → **GitHub Pages** (app) + **GitHub Wiki** (docs)
 - Never force-push. Never commit directly to `main` or `dev`.
 
 ## CI/CD pipelines (`.github/workflows/*.yml`)
@@ -58,7 +58,8 @@ The pipeline has progressive stages, one per promotion hop:
 - **`dev-001` push** — `release` job bumps the version and updates `CHANGELOG.md` from conventional commits (runs before promotion).
 - **`dev-001` → `dev`**: `fast_checks` job — validate compose, build the image, lint. Gates this hop.
 - **`dev` → `main`**: `security_checks` job — **CodeQL** (SAST, mandatory hard gate) + **SonarQube Cloud** (quality gate, fail-closed when `SONAR_TOKEN` is configured; skipped with a notice when absent). This hop fails closed on findings.
-- **`main` → GitHub Pages**: `pages` job — build the **React + Vite** site (`docbase/site/`) and deploy to Pages.
+- **`main` → GitHub Pages**: `pages` job — build the **React + Vite** app (`codebase/site/`) and deploy to Pages.
+- **`main` → GitHub Wiki**: `wiki` job — publish `docbase/` markdown to the repository's GitHub Wiki. Runs in parallel with `pages`. Reuses `PROMOTE_TOKEN`; fails closed if the wiki has not been initialized (one-time manual prerequisite — create the first page at `{repo}/wiki`).
 
 Promotion is driven by the `promote` job, which opens PRs `dev-001 → dev` and `dev → main` and merges each only after its gate check passes. It uses `PROMOTE_TOKEN` (a PAT) so the PRs trigger the gate workflow runs.
 

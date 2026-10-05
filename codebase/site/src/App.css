@@ -1,0 +1,26 @@
+.app {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.app h1 {
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.app p {
+  line-height: 1.6;
+}
+
+.app .hint {
+  color: #57606a;
+  font-size: 0.95rem;
+}
+
+.app code {
+  background: #f6f8fa;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}

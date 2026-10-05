@@ -47,6 +47,7 @@ participant "fast_checks" as fc
 participant "promote" as prom
 participant "security_checks" as sec
 participant "pages" as pg
+participant "wiki" as wk
 
 dev -> git : commit to dev-001
 git -> rls : push
@@ -57,7 +58,10 @@ fc -> prom : pass
 prom -> prom : PR dev-001 → dev (gate: Fast Checks)
 prom -> prom : PR dev → main (gate: Security & Quality)
 prom -> pg : merge to main
-pg -> pg : build Vite site
+prom -> wk : merge to main
+pg -> pg : build Vite app
 pg -> dev : deploy to GitHub Pages
+wk -> wk : sync docbase/
+wk -> dev : publish to GitHub Wiki
 @enduml
 ```
