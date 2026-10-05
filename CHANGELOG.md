@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.4.2 (2026-10-05)
+
+### Fixed
+- make wiki job non-blocking when wiki is not initialized (0.4.2)
+
 ## 0.4.1 (2026-10-05)
 
 ### Fixed
