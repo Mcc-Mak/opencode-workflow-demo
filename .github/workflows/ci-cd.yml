@@ -1,0 +1,494 @@
+name: "CI/CD Pipeline"
+
+on:
+  push:
+    branches:
+      - dev-001
+      - main
+    paths-ignore:
+      - 'CHANGELOG.md'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - dev
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # =========================================================================
+  # 1. RELEASE — Version bump & CHANGELOG (dev-001 push only).
+  #    Parses conventional commits since the last chore(release) commit,
+  #    computes the next semver, prepends a CHANGELOG entry, and pushes a
+  #    release commit to dev-001. Uses GITHUB_TOKEN; its push only changes
+  #    CHANGELOG.md (ignored by paths-ignore) so it does NOT re-trigger.
+  #    Loop-guarded: skips if HEAD is already a release commit.
+  # =========================================================================
+  release:
+    name: Git Control (Version & Changelog)
+    if: github.ref == 'refs/heads/dev-001' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Loop guard — skip own release commits
+        id: guard
+        run: |
+          set -euo pipefail
+          head_subject="$(git log -1 --format=%s)"
+          if [[ "$head_subject" =~ ^chore\(release\):[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "skip=true (HEAD is release commit: $head_subject)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version, update CHANGELOG, commit, push
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          set -euo pipefail
+
+          # 1. Current version = topmost "## X.Y.Z" in CHANGELOG.md (else 0.0.0)
+          current="0.0.0"
+          if [[ -f CHANGELOG.md ]]; then
+            top="$(grep -m1 -E '^## [0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md || true)"
+            if [[ "$top" =~ ^##\ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+              current="${BASH_REMATCH[1]}"
+            fi
+          fi
+          echo "Current version: $current"
+
+          # 2. Boundary = last "chore(release):" commit; else full history
+          boundary="$(git log --grep="^chore(release):" -1 --format=%H || true)"
+          if [[ -n "$boundary" ]]; then
+            subjects="$(git log "${boundary}..HEAD" --format=%s)"
+            bodies="$(git log "${boundary}..HEAD" --format=%B)"
+          else
+            subjects="$(git log --format=%s)"
+            bodies="$(git log --format=%B)"
+          fi
+
+          # 3. Parse conventional commits → grouped entries + bump level
+          feats=(); fixes=(); chores=(); others=(); breaking=0
+          while IFS= read -r subj; do
+            [[ -z "$subj" ]] && continue
+            if [[ "$subj" =~ ^([a-z]+)(\!)?:\ (.+) ]]; then
+              type="${BASH_REMATCH[1]}"; mark="${BASH_REMATCH[2]}"; rest="${BASH_REMATCH[3]}"
+              if [[ -n "$mark" ]]; then breaking=1; fi
+              case "$type" in
+                feat)  feats+=("- $rest");;
+                fix)   fixes+=("- $rest");;
+                chore) chores+=("- $rest");;
+                *)     others+=("- $type: $rest");;
+              esac
+            else
+              others+=("- $subj")
+            fi
+          done <<< "$subjects"
+
+          if grep -qi "^BREAKING CHANGE:" <<< "$bodies"; then breaking=1; fi
+
+          if   [[ $breaking -eq 1 ]]; then bump="major"
+          elif [[ ${#feats[@]} -gt 0 ]]; then bump="minor"
+          else bump="patch"
+          fi
+          echo "Bump: $bump"
+
+          # 4. Compute next version
+          IFS='.' read -r major minor patch <<< "$current"
+          case "$bump" in
+            major) major=$((major+1)); minor=0; patch=0;;
+            minor) minor=$((minor+1)); patch=0;;
+            patch) patch=$((patch+1));;
+          esac
+          next="$major.$minor.$patch"
+          echo "Next version: $next"
+
+          # 5. Entry block (reused for CHANGELOG section + commit body)
+          entry="$(mktemp)"
+          {
+            if [[ $breaking -eq 1 ]]; then
+              printf '### Breaking\n- Breaking change introduced in this release\n\n'
+            fi
+            if [[ ${#feats[@]} -gt 0 ]]; then
+              printf '### Added\n'; printf '%s\n' "${feats[@]}"; printf '\n'
+            fi
+            if [[ ${#fixes[@]} -gt 0 ]]; then
+              printf '### Fixed\n'; printf '%s\n' "${fixes[@]}"; printf '\n'
+            fi
+            if [[ ${#chores[@]} -gt 0 ]] || [[ ${#others[@]} -gt 0 ]]; then
+              printf '### Other\n'
+              if [[ ${#chores[@]} -gt 0 ]]; then printf '%s\n' "${chores[@]}"; fi
+              if [[ ${#others[@]} -gt 0 ]]; then printf '%s\n' "${others[@]}"; fi
+              printf '\n'
+            fi
+          } > "$entry"
+
+          # 6. Prepend new section to CHANGELOG.md (newest first)
+          today="$(date -u +%Y-%m-%d)"
+          {
+            printf '# Changelog\n\n'
+            printf 'All notable changes to this project are documented here. Versions follow semver.\n\n'
+            printf '## %s (%s)\n\n' "$next" "$today"
+            cat "$entry"
+            if [[ -f CHANGELOG.md ]]; then
+              awk 'BEGIN{h=1} h&&/^## [0-9]/{h=0} h{next} {print}' CHANGELOG.md
+            fi
+          } > CHANGELOG.new
+          mv CHANGELOG.new CHANGELOG.md
+
+          # 7. Conventional release commit + push to dev-001
+          git add CHANGELOG.md
+          git commit -m "chore(release): $next" -m "$(cat "$entry")"
+          git push origin dev-001
+          echo "Released $next"
+
+  # =========================================================================
+  # 2. FAST CHECKS — dev-001 → dev gate.
+  #    Validate compose, build the image, lint the Dockerfile. Runs on a
+  #    dev-001 push (after release) and on any PR targeting dev.
+  # =========================================================================
+  fast_checks:
+    name: Fast Checks
+    needs: release
+    if: |
+      !cancelled() &&
+      needs.release.result != 'failure' &&
+      (
+        (github.ref == 'refs/heads/dev-001' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) ||
+        (github.event_name == 'pull_request' && github.base_ref == 'dev')
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Prepare env file from example
+        working-directory: codebase
+        run: cp .env.example .env
+
+      - name: Validate docker-compose
+        working-directory: codebase
+        run: docker compose config -q
+
+      - name: Build image
+        working-directory: codebase
+        run: docker compose build
+
+      - name: Lint Dockerfiles (hadolint)
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(codebase/Dockerfile codebase/Dockerfile.*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No Dockerfiles found — skipping lint"
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            echo "==> hadolint $f"
+            docker run --rm -i hadolint/hadolint:2.12.0-alpine < "$f"
+          done
+
+  # =========================================================================
+  # 3. SECURITY CHECKS — dev → main gate.
+  #    CodeQL (SAST) + SonarQube Cloud (SCA + Quality Gate). Runs only on
+  #    PRs targeting main; fails closed on findings. This is the quality
+  #    gate that promotion through dev → main must pass.
+  # =========================================================================
+  security_checks:
+    name: Security & Quality Gate
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Pulls full git history for accurate Sonar attribution
+
+      # 1. Native GitHub CodeQL Scan (SAST)
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: 'javascript-typescript'
+          config: |
+            paths-ignore:
+              - '**/dist/**'
+              - '**/node_modules/**'
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+
+      # 2. SonarQube Cloud Scan (SCA + Quality + Code Smells)
+      - name: SonarQube Cloud Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+      # 3. Halt pipeline execution if SonarQube Cloud Quality Gate fails.
+      #    Custom script because sonarsource/sonarqube-quality-gate-action@v1
+      #    gets 403 on SonarCloud's CE task API — it doesn't pass the
+      #    organization parameter required by SonarCloud for project-scoped
+      #    tokens.
+      - name: SonarQube Quality Gate Check
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          metadata=".scannerwork/report-task.txt"
+          ceTaskId=$(sed -n 's/^ceTaskId=\(.*\)/\1/p' "$metadata")
+          dashboardUrl=$(sed -n 's/^dashboardUrl=\(.*\)/\1/p' "$metadata")
+          organization=$(sed -n 's/^organization=\(.*\)/\1/p' "$metadata")
+
+          echo "Polling CE task: $ceTaskId (organization: $organization)"
+
+          # Poll CE task status (with organization parameter for SonarCloud)
+          status="PENDING"
+          endTime=$(( SECONDS + 280 ))
+          while [[ "$status" == "PENDING" || "$status" == "IN_PROGRESS" ]] && [ $SECONDS -lt $endTime ]; do
+            printf '.'
+            sleep 5
+            response=$(curl -sf --user "$SONAR_TOKEN:" "${SONAR_HOST_URL}/api/ce/task?id=${ceTaskId}&organization=${organization}" || echo '{"task":{"status":"PENDING"}}')
+            status=$(echo "$response" | jq -r '.task.status')
+          done
+          echo ""
+
+          if [[ "$status" == "PENDING" || "$status" == "IN_PROGRESS" ]]; then
+            echo "::error::Polling timeout reached waiting for Sonar scan to complete"
+            exit 1
+          fi
+          if [[ "$status" == "CANCELED" ]]; then
+            echo "::error::Sonar background task was CANCELED"
+            exit 1
+          fi
+          if [[ "$status" == "FAILED" ]]; then
+            errorMsg=$(echo "$response" | jq -r '.task.errorMessage // "No error message"')
+            echo "::error::Sonar background task FAILED: $errorMsg"
+            exit 1
+          fi
+
+          analysisId=$(echo "$response" | jq -r '.task.analysisId')
+          echo "Analysis ID: $analysisId"
+
+          # Check quality gate status — try analysisId first, fall back to projectKey
+          projectKey=$(sed -n 's/^projectKey=\(.*\)/\1/p' "$metadata")
+          qgStatus=""
+
+          # Attempt 1: analysisId + organization
+          qgResponse=$(curl -s -w "\n%{http_code}" --user "$SONAR_TOKEN:" "${SONAR_HOST_URL}/api/qualitygates/project_status?analysisId=${analysisId}&organization=${organization}" 2>/dev/null || true)
+          httpCode=$(echo "$qgResponse" | tail -1)
+          qgBody=$(echo "$qgResponse" | head -n -1)
+          echo "Quality gate API (analysisId): HTTP $httpCode"
+
+          if [[ "$httpCode" == "200" ]]; then
+            qgStatus=$(echo "$qgBody" | jq -r '.projectStatus.status')
+          else
+            # Attempt 2: projectKey + organization (no analysisId)
+            qgResponse=$(curl -s -w "\n%{http_code}" --user "$SONAR_TOKEN:" "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=${projectKey}&organization=${organization}" 2>/dev/null || true)
+            httpCode=$(echo "$qgResponse" | tail -1)
+            qgBody=$(echo "$qgResponse" | head -n -1)
+            echo "Quality gate API (projectKey): HTTP $httpCode"
+            if [[ "$httpCode" == "200" ]]; then
+              qgStatus=$(echo "$qgBody" | jq -r '.projectStatus.status')
+            fi
+          fi
+
+          echo "Quality Gate status: $qgStatus"
+          echo "Dashboard: $dashboardUrl"
+
+          if [[ -z "$qgStatus" || "$qgStatus" == "null" ]]; then
+            echo "::error::Could not retrieve Quality Gate status (HTTP $httpCode). Check SONAR_TOKEN has Browse permission on the project."
+            exit 1
+          fi
+
+          if [[ "$qgStatus" == "OK" ]]; then
+            echo "::notice::Quality Gate PASSED"
+          elif [[ "$qgStatus" == "WARN" ]]; then
+            echo "::warning::Quality Gate has WARNINGS"
+          elif [[ "$qgStatus" == "ERROR" ]]; then
+            echo "::error::Quality Gate FAILED"
+            exit 1
+          elif [[ "$qgStatus" == "NONE" ]]; then
+            echo "::error::No Quality Gate assigned to this project. Go to SonarCloud → ${organization} → Project Settings → Quality Gates and assign one (e.g. 'Sonar way')."
+            exit 1
+          else
+            echo "::error::Unexpected Quality Gate status: $qgStatus"
+            exit 1
+          fi
+
+  # =========================================================================
+  # 4. AUTO-PROMOTE — Create & merge PRs dev-001→dev→main.
+  #    Runs after fast_checks passes on a dev-001 push. Each promotion
+  #    creates a PR, waits for the gate check appropriate to that hop to
+  #    pass, then merges.
+  #
+  #    dev-001 → dev waits for "Fast Checks".
+  #    dev     → main waits for "Security & Quality Gate".
+  #
+  #    Uses PROMOTE_TOKEN (a PAT) instead of GITHUB_TOKEN because PRs created
+  #    by GITHUB_TOKEN do not trigger pull_request workflow runs (GitHub
+  #    security feature). Without a PAT, the gate check never registers on
+  #    the PR, and the gate is silently bypassed.
+  # =========================================================================
+  promote:
+    name: Auto-Promote (dev-001 → dev → main)
+    needs: fast_checks
+    if: |
+      !cancelled() &&
+      needs.fast_checks.result == 'success' &&
+      github.ref == 'refs/heads/dev-001' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Promote dev-001 → dev → main
+        env:
+          GH_TOKEN: ${{ secrets.PROMOTE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          promote() {
+            local base="$1" head="$2" title="$3" gate="$4"
+
+            git fetch origin "$base" "$head"
+
+            local ahead
+            ahead=$(git rev-list --count "origin/${base}..origin/${head}" 2>/dev/null || echo 0)
+            if [ "$ahead" -eq 0 ]; then
+              echo "${head} has no commits ahead of ${base} — skipping"
+              return 0
+            fi
+            echo "${head} is ${ahead} commits ahead of ${base}"
+
+            local pr_number
+            pr_number=$(gh pr list --base "$base" --head "$head" --state open \
+              --json number --jq '.[0].number // empty')
+            if [ -z "$pr_number" ]; then
+              gh pr create \
+                --base "$base" \
+                --head "$head" \
+                --title "$title" \
+                --body "Automated promotion from ${head} to ${base}."
+              pr_number=$(gh pr list --base "$base" --head "$head" --state open \
+                --json number --jq '.[0].number')
+              echo "Created PR #${pr_number} (${head} → ${base})"
+            else
+              echo "Reusing existing PR #${pr_number} (${head} → ${base})"
+            fi
+
+            echo "Waiting for '${gate}' check to register on PR #${pr_number}..."
+            local gate_registered=false
+            for i in $(seq 1 60); do
+              if gh pr checks "$pr_number" --json name --jq '.[].name' 2>/dev/null \
+                   | grep -q "${gate}"; then
+                echo "  '${gate}' registered"
+                gate_registered=true
+                break
+              fi
+              echo "  Attempt ${i}/60: not yet, waiting 5s..."
+              sleep 5
+            done
+
+            if [ "$gate_registered" != "true" ]; then
+              echo "::error::'${gate}' check never registered on PR #${pr_number} — aborting merge"
+              exit 1
+            fi
+
+            echo "Watching all checks on PR #${pr_number}..."
+            if ! gh pr checks "$pr_number" --watch; then
+              echo "::error::Checks failed on PR #${pr_number} (${head} → ${base})"
+              exit 1
+            fi
+
+            gh pr merge "$pr_number" --merge --delete-branch=false
+            echo "Merged PR #${pr_number} (${head} → ${base})"
+
+            git fetch origin "$base"
+          }
+
+          promote "dev"  "dev-001" "chore: auto-promote dev-001 → dev"  "Fast Checks"
+          promote "main" "dev"     "chore: auto-promote dev → main"     "Security & Quality Gate"
+
+  # =========================================================================
+  # 5. PAGES — main → GitHub Pages.
+  #    Build the React + Vite docs site from docbase/site/ and deploy it
+  #    to GitHub Pages. Triggers on push to main (i.e. after the dev → main
+  #    promotion merges).
+  # =========================================================================
+  pages:
+    name: Deploy Docs to GitHub Pages
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    needs: []
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docbase/site/package-lock.json
+
+      - name: Install dependencies
+        working-directory: docbase/site
+        run: npm ci
+
+      - name: Build docs site
+        working-directory: docbase/site
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docbase/site/dist
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
