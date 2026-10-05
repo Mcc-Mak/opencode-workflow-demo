@@ -45,6 +45,7 @@ Starting a new OpenCode project from scratch requires re-inventing the same infr
 | F-008 | Secret auto-configuration | Should | `scripts/configure-secrets.sh` pushes `.env` values to GitHub encrypted store. |
 | F-009 | Multi-stage Dockerfile | Must | `node` stage builds Vite app, `nginx` stage serves `dist/`. |
 | F-010 | Git tags for releases | Should | Annotated tag on every `chore(release)` commit. |
+| F-011 | Container & supply-chain security hardening | Must | Non-root nginx (`USER nginx` + custom `nginx.conf`), `npm ci --ignore-scripts`, SHA-pinned third-party actions, fail-closed SonarQube QG. |
 
 ## User flows
 
@@ -73,7 +74,7 @@ Starting a new OpenCode project from scratch requires re-inventing the same infr
 | v0.2.0 — Notifications & docs | 2026-10-05 (delivered) |
 | v0.3.x — GitHub Pages deploy | 2026-10-05 (delivered) |
 | v0.4.x — Pages + Wiki split | 2026-10-05 (delivered) |
-| v0.5.x — Workflow hardening | 2026-10-05 (in progress) |
+| v0.5.x — Workflow hardening | 2026-10-05 (delivered) |
 
 ## Open issues
 

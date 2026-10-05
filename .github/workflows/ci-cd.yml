@@ -263,7 +263,7 @@ jobs:
       # 2. SonarQube Cloud Scan (SCA + Quality + Code Smells) — only when configured.
       - name: SonarQube Cloud Scan
         if: steps.check_sonar.outputs.has_sonar == 'true'
-        uses: SonarSource/sonarqube-scan-action@v8
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9  # v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
@@ -352,7 +352,8 @@ jobs:
           elif [[ "$qgStatus" == "WARN" ]]; then
             echo "::warning::Quality Gate has WARNINGS"
           elif [[ "$qgStatus" == "ERROR" ]]; then
-            echo "::warning::Quality Gate FAILED (status: ERROR). Review findings on the SonarCloud dashboard. Non-blocking for template projects — real projects should add tests and tighten this to fail-closed."
+            echo "::error::Quality Gate FAILED (status: ERROR). Review findings on the SonarCloud dashboard: ${dashboardUrl}"
+            exit 1
           elif [[ "$qgStatus" == "NONE" ]]; then
             echo "::error::No Quality Gate assigned to this project. Go to SonarCloud → ${organization} → Project Settings → Quality Gates and assign one (e.g. 'Sonar way')."
             exit 1
@@ -521,7 +522,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: codebase/site
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build app
         working-directory: codebase/site

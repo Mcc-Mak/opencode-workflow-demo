@@ -18,6 +18,10 @@
 | FR-012 | The `wiki` job shall warn and exit 0 when the wiki repository does not yet exist (non-blocking). | Must |
 | FR-013 | `scripts/configure-secrets.sh` shall read a local `.env` and push values into GitHub's encrypted secret store, enable Pages source, and enable the Wiki feature. | Should |
 | FR-014 | The Dockerfile shall be multi-stage: a `node` stage builds the Vite app, an `nginx` stage serves `dist/`. | Must |
+| FR-015 | The runtime container shall run nginx as a non-root user (`USER nginx`) with a custom `nginx.conf` listening on port 8080. | Must |
+| FR-016 | All `npm ci` invocations (Dockerfile and CI workflows) shall use `--ignore-scripts` to prevent supply-chain script execution during dependency installation. | Must |
+| FR-017 | Third-party GitHub Actions shall be pinned to a full commit SHA, not a floating tag (e.g. `@v8`). | Must |
+| FR-018 | The SonarQube Cloud Quality Gate check shall fail-closed (`exit 1` on ERROR status) when `SONAR_TOKEN` is configured. | Must |
 
 ## Non-functional requirements
 
@@ -30,6 +34,7 @@
 | NFR-005 | The `pages` and `wiki` jobs shall run in parallel to minimize deployment latency. | Performance |
 | NFR-006 | Every released version shall have a git tag and a CHANGELOG entry for traceability. | Traceability |
 | NFR-007 | `codebase/` shall be replaceable per project without affecting the reusable infrastructure (`AGENTS.md`, `docbase/`, pipeline, versioning). | Extensibility |
+| NFR-008 | The runtime container shall operate under least privilege (non-root user). | Security |
 
 ## Constraints
 
