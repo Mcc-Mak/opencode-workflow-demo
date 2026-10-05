@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.1.3 (2026-10-05)
+
+### Other
+- fix(ci): make Sonar optional, keep CodeQL as hard gate (0.1.3)
+
 ## 0.1.2 (2026-10-05)
 
 ### Other
