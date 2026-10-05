@@ -3,7 +3,7 @@
 ## Branch model
 
 ```
-dev-001 → dev → main → GitHub Pages
+dev-001 → dev → main → GitHub Pages (app) + GitHub Wiki (docs)
 ```
 
 Working branch is always `dev-001`. Promotion is automated by GitHub Actions; never push directly to `dev` or `main`.
@@ -26,13 +26,17 @@ flowchart LR
     SEC["security_checks\nCodeQL + SonarQube"]
   end
   subgraph pages["GitHub Pages"]
-    DEPLOY["pages\nbuild + deploy Vite site"]
+    DEPLOY["pages\nbuild + deploy Vite app"]
+  end
+  subgraph wiki["GitHub Wiki"]
+    WIKI["wiki\nsync docbase/ markdown"]
   end
 
   PUSH --> RELEASE --> FAST --> PROMOTE
   PROMOTE -->|create PR| PR1 -->|gate: Fast Checks| PROMOTE
   PROMOTE -->|merge| PR2 -->|gate: Security & Quality| SEC
   SEC -->|merge to main| DEPLOY
+  SEC -->|merge to main| WIKI
 ```
 
 ### Promotion sequence (Mermaid)
@@ -46,6 +50,7 @@ sequenceDiagram
   participant GH as GitHub PRs
   participant S as security_checks
   participant PG as pages job
+  participant WK as wiki job
 
   dev001->>R: push (conventional commit)
   R->>R: bump version, update CHANGELOG
@@ -60,7 +65,9 @@ sequenceDiagram
   GH-->>GH: Security & Quality Gate runs
   P->>GH: merge PR (gate passed)
   GH->>PG: push to main triggers pages
-  PG->>PG: build Vite site, deploy to Pages
+  PG->>PG: build Vite app, deploy to Pages
+  GH->>WK: push to main triggers wiki
+  WK->>WK: sync docbase/ to GitHub Wiki
 ```
 
 ## Stages
@@ -70,7 +77,8 @@ sequenceDiagram
 | `dev-001` push | `release` | Bump version (`major.minor.patch`) from conventional commits and update `CHANGELOG.md`. |
 | `dev-001` → `dev` | `fast_checks` | Validate compose, build the image, lint. Gates the promotion PR. |
 | `dev` → `main` | `security_checks` | CodeQL (SAST) + SonarQube Cloud (SCA + quality gate). Fails closed on findings. |
-| `main` → Pages | `pages` | Build the React + Vite docs site and deploy to GitHub Pages. |
+| `main` → Pages | `pages` | Build the React + Vite application (`codebase/site/`) and deploy to GitHub Pages. |
+| `main` → Wiki | `wiki` | Sync `docbase/` markdown to the GitHub Wiki. Runs in parallel with `pages`. Fails closed if the wiki is not initialized. |
 
 ## Versioning
 
@@ -103,7 +111,7 @@ flowchart TD
 | Secret | Used by | Description |
 | --- | --- | --- |
 | `GIT_PUSH_TOKEN` | release | PAT for pushing release commits. Scopes: `repo`, `workflow`. |
-| `PROMOTE_TOKEN` | promote | PAT that creates/merges promotion PRs. GITHUB_TOKEN PRs don't trigger checks. Scopes: `repo`, `workflow`. |
+| `PROMOTE_TOKEN` | promote, wiki | PAT that creates/merges promotion PRs (GITHUB_TOKEN PRs don't trigger checks) and pushes docbase/ to the GitHub Wiki. Scopes: `repo`, `workflow`. |
 | `SONAR_TOKEN` | security_checks | SonarQube Cloud analysis token. Optional — when absent, runs CodeQL-only SAST. |
 | `NOTIFICATION_ADDRESS` | pages | Recipient email for deployment notifications. |
 | `NOTIFICATION_HEADER` | pages | Email subject header for deployment notifications. |
@@ -113,6 +121,7 @@ flowchart TD
 
 - Enable GitHub Pages: **Settings → Pages → Source: GitHub Actions**.
 - Add `dev-001` and `main` as deployment branches in **Settings → Environments → github-pages**.
+- Initialize the GitHub Wiki (one-time prerequisite for the `wiki` job): open **{repo}/wiki** in the browser and create the first page. This creates the `.wiki.git` repository the `wiki` job clones. Until done, the `wiki` job fails closed with a pointer to this URL.
 - Protect `dev` and `main`; require the matching status checks before merge.
 
 ### Deployment topology (PlantUML)
@@ -126,7 +135,8 @@ cloud "GitHub" as GH {
   rectangle "dev-001\n(working branch)" as dev001
   rectangle "dev\n(staging)" as dev
   rectangle "main\n(release)" as main
-  rectangle "GitHub Pages\n(Vite docs site)" as pages
+  rectangle "GitHub Pages\n(Vite app)" as pages
+  rectangle "GitHub Wiki\n(docbase markdown)" as wiki
 }
 
 rectangle "Runner" as runner {
@@ -135,6 +145,7 @@ rectangle "Runner" as runner {
   rectangle "promote job" as prom
   rectangle "security_checks job" as sec
   rectangle "pages job" as pg
+  rectangle "wiki job" as wk
 }
 
 dev001 --> rls : push
@@ -146,5 +157,7 @@ dev --> sec : PR trigger
 sec --> main : merge PR (gate: Security & Quality)
 main --> pg : push trigger
 pg --> pages : deploy
+main --> wk : push trigger
+wk --> wiki : sync
 @enduml
 ```

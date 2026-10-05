@@ -26,7 +26,7 @@ The script pushes each value into GitHub's secret store with `gh secret set`, en
 | Secret | Used by | Description |
 | --- | --- | --- |
 | `GIT_PUSH_TOKEN` | release | PAT for pushing release commits to `dev-001`. Scopes: `repo`, `workflow`. |
-| `PROMOTE_TOKEN` | promote | PAT that creates/merges promotion PRs (GITHUB_TOKEN PRs do not trigger checks). Scopes: `repo`, `workflow`. |
+| `PROMOTE_TOKEN` | promote, wiki | PAT that creates/merges promotion PRs (GITHUB_TOKEN PRs do not trigger checks) and pushes `docbase/` to the GitHub Wiki. Scopes: `repo`, `workflow`. |
 | `SONAR_TOKEN` | security gate | SonarQube Cloud analysis token. Optional — when absent, the dev→main gate runs CodeQL-only SAST; when present, Sonar runs and fails closed on its quality gate. |
 
 ### Notification secrets
@@ -49,11 +49,17 @@ flowchart TB
   D --> G["CI/CD workflow reads secrets at runtime"]
 ```
 
-## Docs site
+## Application site
 
-The GitHub Pages site (`docbase/site/`) deploys at the path matching the repository name. If you rename the repo, update `base` in `docbase/site/vite.config.ts`.
+The React + Vite application (`codebase/site/`) is deployed to GitHub Pages at the path matching the repository name (`/opencode-workflow-demo/`). If you rename the repo, update `base` in `codebase/site/vite.config.ts`.
 
-In addition to the Vite docs site, the raw `docbase/` and `codebase/` directories are staged into the Pages artifact so they are browseable at:
+The multi-stage `codebase/Dockerfile` runs the same Vite build (`npm ci && npm run build`) in a `node` stage and serves the resulting `dist/` from an `nginx` stage. The container and the Pages deploy therefore ship an identical artifact.
 
-- `/{ProjectName}/docbase/` — all documentation source (markdown, TOCTREE)
-- `/{ProjectName}/codebase/` — all implementation source (Dockerfile, compose, .env.example)
+## Documentation (GitHub Wiki)
+
+`docbase/` is markdown-only and is published to the repository's GitHub Wiki by the `wiki` job on push to `main`.
+
+- The `wiki` job clones `{repo}.wiki.git`, copies `docbase/TOCTREE.md` and `docbase/docs/*.md` (preserving the `docs/` subpath), generates a minimal `Home.md` and a `_Sidebar.md` (from `TOCTREE.md`), rewrites `docs/X.md` links to `docs/X` for wiki resolution, and pushes with `--force-with-lease` (docbase is the source of truth).
+- It reuses `PROMOTE_TOKEN` (its `repo` scope covers the wiki repo).
+- **One-time prerequisite:** the wiki must be initialized via the GitHub UI (open `{repo}/wiki` and create the first page). Until then the `.wiki.git` repository does not exist and the `wiki` job fails closed with a pointer to that URL.
+- Wiki-side edits made through the browser are overwritten on the next sync; edit `docbase/` instead.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Configure CI/CD secrets, notification settings, and GitHub Pages from a
-# local .env file.
+# Configure CI/CD secrets, notification settings, GitHub Pages, and the GitHub
+# Wiki from a local .env file.
 #
 # Usage:
 #   cp .env.example .env        # then fill in real token values
@@ -8,8 +8,10 @@
 #
 # Reads variables from .env (gitignored) and stores them as encrypted
 # repository secrets via `gh secret set`. Also enables GitHub Pages with
-# Source = GitHub Actions and registers dev-001 as a deployment branch for
-# the github-pages environment. Never commits anything.
+# Source = GitHub Actions, enables the repository Wiki feature, and registers
+# dev-001 as a deployment branch for the github-pages environment. The Wiki
+# still needs a one-time manual first-page creation at {repo}/wiki. Never
+# commits anything.
 
 set -euo pipefail
 
@@ -72,6 +74,17 @@ else
     && echo "  Pages enabled with Source = GitHub Actions." \
     || echo "  ::warning:: Could not enable Pages via API. Enable it manually: Settings → Pages → Source: GitHub Actions."
 fi
+
+# ── GitHub Wiki ─────────────────────────────────────────────────────────────
+echo ""
+echo "Enabling GitHub Wiki..."
+# Turn on the repository wiki feature. The wiki job publishes docbase/ here.
+# Non-fatal: a one-time manual page creation at {repo}/wiki is still required
+# before the job can clone the .wiki.git repo (the API cannot create that
+# initial page); the job fails closed with a notice until then.
+gh api -X PATCH repos/:owner/:repo -F has_wiki=true >/dev/null 2>&1 \
+  && echo "  Wiki feature enabled. Initialize it once: open {repo}/wiki and create the first page." \
+  || echo "  ::warning:: Could not enable the Wiki via API. Enable it manually: Settings → General → Features → Wikis."
 
 # ── Deployment branch policy ────────────────────────────────────────────────
 echo ""

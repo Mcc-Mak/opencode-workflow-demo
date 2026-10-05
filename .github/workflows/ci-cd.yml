@@ -490,12 +490,13 @@ jobs:
 
   # =========================================================================
   # 5. PAGES — main → GitHub Pages.
-  #    Build the React + Vite docs site from docbase/site/ and deploy it
+  #    Build the React + Vite application from codebase/site/ and deploy it
   #    to GitHub Pages. Triggers on push to main (i.e. after the dev → main
-  #    promotion merges).
+  #    promotion merges). The same Vite build is produced by the multi-stage
+  #    Dockerfile, so the container and Pages deploy an identical artifact.
   # =========================================================================
   pages:
-    name: Deploy Docs to GitHub Pages
+    name: Deploy App to GitHub Pages
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     needs: []
@@ -516,55 +517,114 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: docbase/site/package-lock.json
+          cache-dependency-path: codebase/site/package-lock.json
 
       - name: Install dependencies
-        working-directory: docbase/site
+        working-directory: codebase/site
         run: npm ci
 
-      - name: Build docs site
-        working-directory: docbase/site
+      - name: Build app
+        working-directory: codebase/site
         run: npm run build
-
-      - name: Stage docbase/ and codebase/ for Pages
-        run: |
-          set -euo pipefail
-          # Copy docbase/ (excluding site/ source) and codebase/ into the
-          # Vite build output so they are served at:
-          #   /{ProjectName}/docbase/  and  /{ProjectName}/codebase/
-          dist="docbase/site/dist"
-          mkdir -p "$dist/docbase" "$dist/codebase"
-
-          # docbase/ minus site/ (Vite source — already built into dist/)
-          rsync -a --exclude='site/' docbase/ "$dist/docbase/"
-
-          # codebase/ as-is (.env is gitignored so won't be present)
-          rsync -a codebase/ "$dist/codebase/"
-
-          echo "Staged directories:"
-          ls -la "$dist"
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
 
       - name: Upload Pages artifact
-        # We build the tar manually instead of using upload-pages-artifact@v4
-        # because that action hardcodes --exclude=".[^/]*" which strips ALL
-        # dotfiles (including .nojekyll and codebase/.env.example).
-        run: |
-          tar \
-            --dereference --hard-dereference \
-            --directory docbase/site/dist \
-            -cvf "$RUNNER_TEMP/artifact.tar" \
-            --exclude=.git \
-            --exclude=.github \
-            .
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v4
         with:
-          name: github-pages
-          path: ${{ runner.temp }}/artifact.tar
-          retention-days: 1
+          path: codebase/site/dist
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v5
+
+  # =========================================================================
+  # 6. WIKI — main → GitHub Wiki.
+  #    Publish docbase/ markdown to the repository's GitHub Wiki. Runs in
+  #    parallel with the pages job on push to main. docbase/ is the single
+  #    source of truth; the wiki is a generated mirror (force-with-lease
+  #    push keeps it in sync).
+  #
+  #    The wiki is a separate git repo at {repo}.wiki.git that must be
+  #    initialized ONCE via the GitHub UI (create the first page at
+  #    {repo}/wiki). Until then the clone below fails closed with a notice.
+  #    Reuses PROMOTE_TOKEN (repo scope covers the wiki repo).
+  # =========================================================================
+  wiki:
+    name: Sync Docs to GitHub Wiki
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    needs: []
+    permissions:
+      contents: read
+    concurrency:
+      group: wiki-${{ github.ref }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Publish docbase/ to GitHub Wiki
+        env:
+          GH_TOKEN: ${{ secrets.PROMOTE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::PROMOTE_TOKEN secret is not set. It is reused for wiki pushes (repo scope covers the .wiki.git repo). Add it as the PROMOTE_TOKEN repository secret."
+            exit 1
+          fi
+
+          repo_full="${{ github.repository }}"
+          wiki_url="https://x-access-token:${GH_TOKEN}@github.com/${repo_full}.wiki.git"
+          wiki_dir="$(mktemp -d)"
+
+          # Clone the wiki repo. If it fails, the wiki has not been
+          # initialized yet — fail closed with a clear pointer.
+          if ! git clone --depth 1 "$wiki_url" "$wiki_dir"; then
+            echo "::error::Could not clone the wiki repo for ${repo_full}. Initialize it once by creating the first page at https://github.com/${repo_full}/wiki, then re-run this workflow."
+            exit 1
+          fi
+
+          # Wipe the checked-out wiki content (keep .git) so removed docs
+          # don't linger. docbase/ is the source of truth.
+          find "$wiki_dir" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+
+          # Copy TOCTREE and the docs (preserving the docs/ subpath).
+          cp docbase/TOCTREE.md "$wiki_dir/TOCTREE.md"
+          mkdir -p "$wiki_dir/docs"
+          cp docbase/docs/*.md "$wiki_dir/docs/"
+
+          # Minimal landing page that points to the index.
+          cat > "$wiki_dir/Home.md" <<'EOF'
+          # opencode-workflow-demo
+
+          Project documentation is indexed in [TOCTREE](TOCTREE).
+          EOF
+
+          # The sidebar mirrors TOCTREE so navigation renders on every page.
+          cp docbase/TOCTREE.md "$wiki_dir/_Sidebar.md"
+
+          # Rewrite intra-doc links: docs/X.md -> docs/X (wiki pages have
+          # no .md suffix). Runs over every staged markdown file.
+          while IFS= read -r -d '' f; do
+            sed -i -E 's|\(docs/([A-Za-z0-9_.-]+)\.md\)|(docs/\1)|g' "$f"
+          done < <(find "$wiki_dir" -name '*.md' -print0)
+
+          echo "Staged wiki pages:"
+          (cd "$wiki_dir" && find . -name '*.md' ! -path './.git/*' | sort)
+
+          # Commit + push. force-with-lease makes re-runs idempotent if the
+          # wiki history diverged (docbase/ is authoritative).
+          short_sha="$(git rev-parse --short HEAD)"
+          git -C "$wiki_dir" add -A
+          if git -C "$wiki_dir" diff --cached --quiet; then
+            echo "No wiki changes since last sync — skipping push."
+            exit 0
+          fi
+          git -C "$wiki_dir" -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "docs: sync wiki from docbase@${short_sha}"
+          git -C "$wiki_dir" push --force-with-lease origin HEAD
+          echo "Wiki synced."
