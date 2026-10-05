@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.5.0 (2026-10-05)
+
+### Added
+- use README.md as wiki Home, add sonar.branch.name=main (0.4.4)
+
+## 0.4.3 (2026-10-05)
+
+### Fixed
+- flatten wiki pages to root — GitHub Wiki ignores subdirectories (0.4.3)
+
 ## 0.4.2 (2026-10-05)
 
 ### Fixed
