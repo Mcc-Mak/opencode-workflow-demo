@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.3.1 (2026-10-05)
+
+### Fixed
+- add .nojekyll so Pages serves dotfiles like .env.example (0.3.1)
+
 ## 0.3.0 (2026-10-05)
 
 ### Added
