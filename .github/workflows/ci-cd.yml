@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout (full history)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -179,7 +179,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Prepare env file from example
         working-directory: codebase
@@ -224,9 +224,20 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0 # Pulls full git history for accurate Sonar attribution
+
+      # 0. Fail fast with a clear message if required secrets are missing.
+      - name: Verify required secrets
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SONAR_TOKEN:-}" ]; then
+            echo "::error::SONAR_TOKEN secret is not set. Create a SonarQube Cloud token (SonarCloud → My Account → Security) and add it as the SONAR_TOKEN repository secret."
+            exit 1
+          fi
 
       # 1. Native GitHub CodeQL Scan (SAST)
       - name: Initialize CodeQL
@@ -243,7 +254,7 @@ jobs:
 
       # 2. SonarQube Cloud Scan (SCA + Quality + Code Smells)
       - name: SonarQube Cloud Scan
-        uses: SonarSource/sonarqube-scan-action@v6
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
@@ -372,7 +383,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -381,6 +392,13 @@ jobs:
           GH_TOKEN: ${{ secrets.PROMOTE_TOKEN }}
         run: |
           set -euo pipefail
+
+          # Fail fast with a clear message if the PAT was not configured.
+          # Without it, gh falls back to an empty token and fails opaquely.
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::PROMOTE_TOKEN secret is not set. Create a GitHub Personal Access Token with 'repo' and 'workflow' scopes, then add it as the PROMOTE_TOKEN repository secret. GITHUB_TOKEN cannot be used because PRs it creates do not trigger pull_request workflow runs, so the gate checks would never register."
+            exit 1
+          fi
 
           promote() {
             local base="$1" head="$2" title="$3" gate="$4"
@@ -465,10 +483,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -483,12 +501,12 @@ jobs:
         run: npm run build
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: docbase/site/dist
 
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
