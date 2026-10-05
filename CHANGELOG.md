@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here. Versions follow semver.
 
+## 0.4.1 (2026-10-05)
+
+### Fixed
+- bootstrap wiki on first run instead of failing closed (0.4.1)
+
 ## 0.4.0 (2026-10-05)
 
 ### Added

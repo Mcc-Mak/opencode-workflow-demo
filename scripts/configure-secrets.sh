@@ -9,8 +9,7 @@
 # Reads variables from .env (gitignored) and stores them as encrypted
 # repository secrets via `gh secret set`. Also enables GitHub Pages with
 # Source = GitHub Actions, enables the repository Wiki feature, and registers
-# dev-001 as a deployment branch for the github-pages environment. The Wiki
-# still needs a one-time manual first-page creation at {repo}/wiki. Never
+# dev-001 as a deployment branch for the github-pages environment. Never
 # commits anything.
 
 set -euo pipefail
@@ -79,11 +78,10 @@ fi
 echo ""
 echo "Enabling GitHub Wiki..."
 # Turn on the repository wiki feature. The wiki job publishes docbase/ here.
-# Non-fatal: a one-time manual page creation at {repo}/wiki is still required
-# before the job can clone the .wiki.git repo (the API cannot create that
-# initial page); the job fails closed with a notice until then.
+# The job bootstraps the wiki itself (no manual UI page creation needed) —
+# it pushes a fresh local repo to {repo}.wiki.git on the first run.
 gh api -X PATCH repos/:owner/:repo -F has_wiki=true >/dev/null 2>&1 \
-  && echo "  Wiki feature enabled. Initialize it once: open {repo}/wiki and create the first page." \
+  && echo "  Wiki feature enabled." \
   || echo "  ::warning:: Could not enable the Wiki via API. Enable it manually: Settings → General → Features → Wikis."
 
 # ── Deployment branch policy ────────────────────────────────────────────────
