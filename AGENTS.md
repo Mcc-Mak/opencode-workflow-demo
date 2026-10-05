@@ -22,6 +22,8 @@ Code and docs are strictly separated. Do not mix them.
   - `site/` — React + Vite docs site, built and deployed to GitHub Pages on push to `main`
   - **CRM** = Cross-Reference Matrix (maps requirements → docs → tests). Keep it updated when requirements change.
 - `CHANGELOG.md` (repo root) — one entry per change, versioned `major.minor.patch`
+- `.env.example` (repo root) — documents CI/CD secrets (`PROMOTE_TOKEN`, `SONAR_TOKEN`); copy to gitignored `.env` and run `scripts/configure-secrets.sh`
+- `scripts/configure-secrets.sh` — pushes local `.env` secret values into GitHub's encrypted store and enables Pages
 - `.github/workflows/*.yml` — CI/CD pipelines
 
 When adding a doc, also add it to `docbase/TOCTREE.md`. When adding an env var, also add it to `codebase/.env.example`.

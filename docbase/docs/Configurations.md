@@ -12,10 +12,19 @@ All configurable knobs live in `codebase/.env.example`. Copy it to `codebase/.en
 
 ## CI/CD secrets
 
+These are stored as encrypted **repository secrets** (GitHub-hosted runners cannot read a local `.env` at runtime). Configure them from a local `.env` via the auto-config script:
+
+```bash
+cp .env.example .env          # fill in real token values
+./scripts/configure-secrets.sh
+```
+
+The script pushes each value into GitHub's secret store with `gh secret set` and enables GitHub Pages. Real `.env` is gitignored.
+
 | Secret | Used by | Description |
 | --- | --- | --- |
+| `PROMOTE_TOKEN` | auto-promote | PAT that creates/merges promotion PRs (GITHUB_TOKEN PRs do not trigger checks). Scopes: `repo`, `workflow`. |
 | `SONAR_TOKEN` | security gate | SonarQube Cloud analysis token. |
-| `PROMOTE_TOKEN` | auto-promote | PAT that creates/merges promotion PRs (GITHUB_TOKEN PRs do not trigger checks). |
 
 ## Docs site
 

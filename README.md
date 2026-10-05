@@ -47,9 +47,20 @@ Strict `major.minor.patch`. The `release` job derives the bump from conventional
 
 ## Prerequisites
 
-- GitHub Pages enabled: **Settings → Pages → Source: GitHub Actions**.
-- Secret `SONAR_TOKEN` — SonarQube Cloud analysis token.
-- Secret `PROMOTE_TOKEN` — GitHub PAT (`repo` + `workflow`) so promotion PRs trigger checks.
+Configure secrets and Pages from a local `.env` (auto-config):
+
+```bash
+cp .env.example .env          # fill in PROMOTE_TOKEN and SONAR_TOKEN
+./scripts/configure-secrets.sh
+```
+
+What you need before filling in `.env`:
+
+- **`PROMOTE_TOKEN`** — GitHub PAT with `repo` + `workflow` scopes (PRs created by `GITHUB_TOKEN` don't trigger checks, so promotion needs a PAT).
+- **`SONAR_TOKEN`** — SonarQube Cloud token (SonarCloud → My Account → Security).
+- GitHub Pages source set to **GitHub Actions** (the script does this; or set it manually under Settings → Pages).
+
+Real `.env` is gitignored — never commit it.
 
 ## Quick start
 
